@@ -44,8 +44,8 @@ app.post("/start-ai-agent", async (req, res) => {
   console.log(`[API] /start-ai-agent called for channel: ${channel_id}`);
 
   // Simple validation
-  if (!channel_id) {
-    res.status(400).json({ error: "Missing required fields" });
+  if (!channel_id || typeof channel_id !== "string") {
+    res.status(400).json({ error: "Missing or invalid channel_id" });
     return;
   }
 
@@ -67,7 +67,7 @@ app.post("/start-ai-agent", async (req, res) => {
 
       const agent = await createAgent(
         user_id,
-        AgentPlatform.OPENAI,
+        AgentPlatform.SYMPTOM_ANALYZER,
         channel_type,
         channel_id
       );
@@ -102,6 +102,9 @@ app.post("/start-ai-agent", async (req, res) => {
 app.post("/stop-ai-agent", async (req, res) => {
   const { channel_id } = req.body;
   console.log(`[API] /stop-ai-agent called for channel: ${channel_id}`);
+  if (!channel_id || typeof channel_id !== "string") {
+    return res.status(400).json({ error: "Missing or invalid channel_id" });
+  }
   const user_id = `ai-bot-${channel_id.replace(/[!]/g, "")}`;
   try {
     const aiAgent = aiAgentCache.get(user_id);

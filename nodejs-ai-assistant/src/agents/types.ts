@@ -10,6 +10,7 @@ export interface AIAgent {
 }
 
 export enum AgentPlatform {
+  SYMPTOM_ANALYZER = "symptom_analyzer",
   OPENAI = "openai",
   WRITING_ASSISTANT = "writing_assistant",
 }

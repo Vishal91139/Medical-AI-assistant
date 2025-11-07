@@ -1,11 +1,12 @@
 import { useAIAgentStatus } from "@/hooks/use-ai-agent-status";
 import {
   Bot,
-  Briefcase,
-  FileText,
-  Lightbulb,
+  Stethoscope,
+  HeartPulse,
+  Pill,
+  Ambulance,
   Menu,
-  MessageSquare,
+  Thermometer,
   Sparkles,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -35,50 +36,50 @@ const EmptyStateWithInput: React.FC<{
 }> = ({ onNewChatMessage }) => {
   const [inputText, setInputText] = useState("");
 
-  // Research-based writing prompts organized by category
-  const writingCategories = [
+  // Medical assistant prompts organized by category
+  const medicalCategories = [
     {
-      id: "business",
-      icon: <Briefcase className="h-4 w-4" />,
-      title: "Business",
+      id: "symptoms",
+      icon: <Thermometer className="h-4 w-4" />,
+      title: "Symptoms",
       prompts: [
-        "Write a professional email to my boss about a project update",
-        "Draft a compelling LinkedIn post about a recent achievement",
-        "Create an executive summary for a quarterly business report",
-        "Write a persuasive proposal for a new marketing campaign",
+        "I have a fever, cough, and sore throat for 2 days",
+        "I feel chest tightness when climbing stairs",
+        "I have stomach pain after eating spicy food",
+        "I’m feeling dizzy and weak since this morning",
       ],
     },
     {
-      id: "content",
-      icon: <FileText className="h-4 w-4" />,
-      title: "Content",
+      id: "medications",
+      icon: <Pill className="h-4 w-4" />,
+      title: "Medications",
       prompts: [
-        "Write a blog post about emerging trends in my industry",
-        "Create engaging social media captions for a product launch",
-        "Draft a newsletter that drives customer engagement",
-        "Write compelling product descriptions that convert",
+        "Can I take ibuprofen and paracetamol together?",
+        "What are common side effects of amoxicillin?",
+        "Is antihistamine safe with my blood pressure medicine?",
+        "How to read a prescription label correctly?",
       ],
     },
     {
-      id: "communication",
-      icon: <MessageSquare className="h-4 w-4" />,
-      title: "Communication",
+      id: "firstaid",
+      icon: <Ambulance className="h-4 w-4" />,
+      title: "First Aid",
       prompts: [
-        "Rewrite this text to be more clear and concise",
-        "Improve the tone of this message to sound more professional",
-        "Create a presentation script that keeps audiences engaged",
-        "Write customer service responses that build trust",
+        "What should I do immediately for a minor burn?",
+        "How to manage a nosebleed at home?",
+        "When is a headache an emergency?",
+        "What’s the RICE method for ankle sprain?",
       ],
     },
     {
-      id: "creative",
-      icon: <Lightbulb className="h-4 w-4" />,
-      title: "Creative",
+      id: "wellness",
+      icon: <HeartPulse className="h-4 w-4" />,
+      title: "Wellness",
       prompts: [
-        "Brainstorm innovative solutions for a common problem",
-        "Generate creative angles for a story or article",
-        "Develop character backstories for creative writing",
-        "Create compelling headlines that grab attention",
+        "How much water should I drink per day?",
+        "Beginner-friendly home workout plan",
+        "Healthy sleep tips for night-shift workers",
+        "Low-sodium diet suggestions",
       ],
     },
   ];
@@ -95,27 +96,27 @@ const EmptyStateWithInput: React.FC<{
           <div className="mb-6">
             <div className="relative inline-flex items-center justify-center w-16 h-16 mb-4">
               <div className="absolute inset-0 bg-primary/20 rounded-2xl animate-pulse"></div>
-              <Bot className="h-8 w-8 text-primary relative z-10" />
+              <Stethoscope className="h-8 w-8 text-primary relative z-10" />
               <Sparkles className="h-4 w-4 text-primary/60 absolute -top-1 -right-1" />
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              Your AI Writing Partner
+              Your Medical AI Assistant
             </h1>
             <p className="text-sm text-muted-foreground mb-4">
-              From first drafts to final edits, I'm here to help you write
-              better, faster.
+              Get guidance on symptoms, medications, first-aid, and wellness.
+              This is educational only and not a diagnosis.
             </p>
           </div>
 
           {/* Writing Prompt Categories - Tabbed Interface */}
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              What would you like to write today?
+              What do you need help with today?
             </h2>
 
             <Tabs defaultValue="business" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
-                {writingCategories.map((category) => (
+                {medicalCategories.map((category) => (
                   <TabsTrigger
                     key={category.id}
                     value={category.id}
@@ -127,7 +128,7 @@ const EmptyStateWithInput: React.FC<{
                 ))}
               </TabsList>
 
-              {writingCategories.map((category) => (
+              {medicalCategories.map((category) => (
                 <TabsContent
                   key={category.id}
                   value={category.id}
@@ -158,7 +159,7 @@ const EmptyStateWithInput: React.FC<{
         <div className="p-4">
           <ChatInput
             sendMessage={onNewChatMessage}
-            placeholder="Describe what you'd like to write, or paste text to improve..."
+            placeholder="Describe your symptoms or ask a health question..."
             value={inputText}
             onValueChange={setInputText}
             className="!p-4"
@@ -169,6 +170,8 @@ const EmptyStateWithInput: React.FC<{
             <span>Press Enter to send</span>
             <span>•</span>
             <span>Shift + Enter for new line</span>
+            <span>•</span>
+            <span className="text-red-600 dark:text-red-400">Not medical advice</span>
           </div>
         </div>
       </div>
@@ -280,7 +283,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-                <Bot className="h-4 w-4 text-primary-foreground" />
+                <Stethoscope className="h-4 w-4 text-primary-foreground" />
               </div>
               {channel?.id && agentStatus.status === "connected" && (
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
@@ -288,10 +291,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground">
-                {channel?.data?.name || "New Writing Session"}
+                {channel?.data?.name || "New Consultation"}
               </h2>
               <p className="text-xs text-muted-foreground">
-                AI Writing Assistant • Always improving
+                Medical AI Assistant • Educational only, not a diagnosis
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { StreamChat } from "stream-chat";
 import { apiKey, serverClient } from "../serverClient";
 import { OpenAIAgent } from "./openai/OpenAIAgent";
+import { SAAgent } from "./symptomAnalyzer/SAAgent";
 import { AgentPlatform, AIAgent } from "./types";
 
 export const createAgent = async (
@@ -20,6 +21,8 @@ export const createAgent = async (
   await channel.watch();
 
   switch (platform) {
+    case AgentPlatform.SYMPTOM_ANALYZER:
+      return new SAAgent(chatClient, channel);
     case AgentPlatform.WRITING_ASSISTANT:
     case AgentPlatform.OPENAI:
       return new OpenAIAgent(chatClient, channel);
