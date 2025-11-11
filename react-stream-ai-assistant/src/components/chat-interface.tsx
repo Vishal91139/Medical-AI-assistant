@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface ChatInterfaceProps {
   onToggleSidebar: () => void;
-  onNewChatMessage: (message: { text: string }) => Promise<void>;
+  onNewChatMessage: (message: { text: string; attachments?: any[] }) => Promise<void>;
   backendUrl: string;
 }
 
@@ -165,6 +165,7 @@ const EmptyStateWithInput: React.FC<{
             className="!p-4"
             isGenerating={false}
             onStopGenerating={() => {}}
+            enableImageMode={false}
           />
           <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
             <span>Press Enter to send</span>
@@ -230,6 +231,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const { aiState } = useAIState(channel);
     const [inputText, setInputText] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [imageMode, setImageMode] = useState(false);
 
     const isGenerating =
       aiState === "AI_STATE_THINKING" ||
@@ -253,6 +255,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     };
 
+    // Resolve a File to a Stream CDN URL by uploading it to the current channel
+    const resolveImageUrl = async (file: File): Promise<string> => {
+      if (!channel) throw new Error("No active channel to upload image.");
+      try {
+        const res = await channel.sendImage(file);
+        const url = (res as any)?.file as string | undefined;
+        if (!url) throw new Error("Image upload did not return a file URL.");
+        return url;
+      } catch (err) {
+        console.error("[ChatInterface] Stream image upload failed:", err);
+        throw err;
+      }
+    };
+
     return (
       <ChatInput
         sendMessage={sendMessage}
@@ -263,6 +279,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         className="!p-4"
         isGenerating={isGenerating}
         onStopGenerating={handleStopGenerating}
+        enableImageMode={true}
+        imageMode={imageMode}
+        onImageModeChange={setImageMode}
+        onResolveImageUrl={resolveImageUrl}
       />
     );
   };

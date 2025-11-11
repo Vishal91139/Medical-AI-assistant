@@ -2,6 +2,8 @@ import { StreamChat } from "stream-chat";
 import { apiKey, serverClient } from "../serverClient";
 import { OpenAIAgent } from "./openai/OpenAIAgent";
 import { SAAgent } from "./symptomAnalyzer/SAAgent";
+import { IAAgent } from "./ImageAnalyzer/IAAgent";
+import { MultiAgent } from "./MultiAgent";
 import { AgentPlatform, AIAgent } from "./types";
 
 export const createAgent = async (
@@ -21,8 +23,13 @@ export const createAgent = async (
   await channel.watch();
 
   switch (platform) {
+    case AgentPlatform.MULTI:
+      return new MultiAgent(chatClient, channel);
+    case AgentPlatform.IMAGE_ANALYZER:
+      return new IAAgent(chatClient, channel);
     case AgentPlatform.SYMPTOM_ANALYZER:
-      return new SAAgent(chatClient, channel);
+      // Use MultiAgent to automatically choose based on message (text vs text+image)
+      return new MultiAgent(chatClient, channel);
     case AgentPlatform.WRITING_ASSISTANT:
     case AgentPlatform.OPENAI:
       return new OpenAIAgent(chatClient, channel);

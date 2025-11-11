@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Bot, Check, Copy } from "lucide-react";
+import { Bot, Check, Copy, Maximize2, X } from "lucide-react";
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -88,6 +88,24 @@ const ChatMessage: React.FC = () => {
                 : "str-chat__message-bubble rounded-bl-md"
             )}
           >
+            {/* Image attachments (render above text) */}
+            {!!message.attachments?.length && (
+              <div className="mb-2 space-y-3">
+                {message.attachments
+                  .filter((a: any) => {
+                    const hasImageUrl = !!(a?.image_url || a?.asset_url || a?.thumb_url || a?.og_scrape_url);
+                    const isImageType = a?.type === "image" || (typeof a?.mime_type === "string" && a.mime_type.startsWith("image/"));
+                    return hasImageUrl || isImageType;
+                  })
+                  .map((a: any, idx: number) => {
+                    const src = a.image_url || a.asset_url || a.thumb_url || a.og_scrape_url;
+                    if (!src) return null;
+                    return (
+                      <ImagePreviewCard key={idx} src={src} title={a?.title} />
+                    );
+                  })}
+              </div>
+            )}
             {/* Message Text */}
             <div className="break-words">
               <ReactMarkdown
@@ -208,3 +226,60 @@ const ChatMessage: React.FC = () => {
 };
 
 export default ChatMessage;
+
+// Local component for image preview with optional lightbox/fullscreen
+const ImagePreviewCard: React.FC<{ src: string; title?: string }> = ({ src, title }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="group border border-border/40 rounded-lg bg-muted/20 backdrop-blur-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="relative w-full cursor-zoom-in"
+      >
+        <img
+          src={src}
+          alt={title || "image"}
+          className="w-full h-auto block select-none"
+          loading="lazy"
+        />
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="p-1 rounded bg-background/80 border border-border/40 shadow-sm">
+            <Maximize2 className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+      </button>
+      {title && (
+        <div className="px-2 py-1 text-xs text-muted-foreground border-t border-border/40 truncate">
+          {title}
+        </div>
+      )}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div className="relative max-w-5xl w-full">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={src}
+              alt={title || "image-full"}
+              className="w-full h-auto rounded-lg shadow-xl"
+            />
+            {title && (
+              <div className="mt-3 text-sm text-white/80 text-center">
+                {title}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

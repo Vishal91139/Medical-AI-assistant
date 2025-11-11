@@ -37,6 +37,11 @@ export class SAAgent implements AIAgent {
 
     private handleMessage = async (e: Event<DefaultGenerics>) => {
         if (!e.message || e.message.ai_generated) return;
+        // If the message has an image attachment, let IAAgent handle it
+        const hasImage = (e.message.attachments || []).some(
+            (a: any) => a?.type === "image" && (a.image_url || a.asset_url || a.thumb_url || a.og_scrape_url)
+        );
+        if (hasImage) return;
         const text = e.message.text;
         if (!text) return;
 

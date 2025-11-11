@@ -13,6 +13,8 @@ export enum AgentPlatform {
   SYMPTOM_ANALYZER = "symptom_analyzer",
   OPENAI = "openai",
   WRITING_ASSISTANT = "writing_assistant",
+  IMAGE_ANALYZER = "image_analyzer",
+  MULTI = "multi",
 }
 
 // Extended message type for writing assistant features
