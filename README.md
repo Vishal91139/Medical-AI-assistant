@@ -1,42 +1,35 @@
 # Chat AI App
 
-A modern AI-powered chat application built with **Stream Chat**, **OpenAI**, and **web search capabilities**. This full-stack application provides an intelligent writing assistant that can help with content creation, research, and real-time collaboration.
+Lightweight AI chat application powered by **Stream Chat** and a **MedGemma (Gradio) backend**. Focuses purely on real-time messaging and image+text AI interaction.
 
 ## 🚀 Features
 
-- **Real-time Chat**: Powered by [GetStream.io](https://getstream.io) for seamless messaging
-- **AI Writing Assistant**: OpenAI GPT-4 integration for intelligent content generation
-- **Web Search**: Live web search capabilities using Tavily API for current information
-- **Modern UI**: Beautiful React interface with dark/light theme support
-- **Writing Prompts**: Categorized writing prompts for business, content, communication, and creative tasks
-- **Agent Management**: Dynamic AI agent lifecycle management
-- **Secure Authentication**: JWT-based token authentication
-- **Responsive Design**: Mobile-first design with Tailwind CSS
+- **Real-time Chat** via GetStream
+- **MedGemma Integration** (Gradio endpoint) for AI replies
+- **Image Attachments** forwarded to the AI model
+- **Agent Lifecycle** (start / status / stop)
+- **Clean Minimal UI** with dark mode
 
 ## 🏗️ Architecture
 
 ### Backend (`nodejs-ai-assistant/`)
 
-- **Node.js/Express** server
-- **Stream Chat** server-side integration
-- **OpenAI API** for AI responses
-- **Tavily API** for web search functionality
-- Agent management system with automatic cleanup
+- Node.js + Express
+- Stream Chat server SDK
+- MedGemma agent bridging messages to a Gradio app
+- Automatic disposal of inactive agents
 
 ### Frontend (`react-stream-ai-assistant/`)
 
-- **React** with TypeScript
-- **Stream Chat React** components
-- **Tailwind CSS** + **shadcn/ui** for modern styling
-- **Vite** for fast development and building
+- React + TypeScript + Vite
+- Stream Chat React components
+- Tailwind CSS + shadcn/ui
 
 ## 📋 Prerequisites
 
-- Node.js 20 or higher
-- npm or yarn package manager
-- GetStream.io account (free tier available)
-- OpenAI API account
-- Tavily API account (for web search)
+- Node.js 20+
+- GetStream.io account
+- Running MedGemma Gradio endpoint (public URL)
 
 ## 🛠️ Setup Instructions
 
@@ -67,18 +60,19 @@ Create environment file by copying the example:
 cp .env.example .env
 ```
 
-Configure your `.env` file with the following keys:
+Configure your backend `.env` file with the following keys:
 
 ```env
-# GetStream credentials - Get these from https://getstream.io/dashboard
+# Stream credentials
 STREAM_API_KEY=your_stream_api_key_here
 STREAM_API_SECRET=your_stream_api_secret_here
+STREAM_APP_ID=your_stream_app_id_here
 
-# OpenAI API key - Get from https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Tavily API key - Get from https://tavily.com
-TAVILY_API_KEY=your_tavily_api_key_here
+# MedGemma (Gradio) configuration
+GRADIO_BASE_URL=https://your-gradio.hf.space/
+GRADIO_API_NAME=/predict
+DEFAULT_AGENT_PLATFORM=medgemma
+PORT=4550
 ```
 
 ### 3. Frontend Setup
@@ -101,14 +95,108 @@ Create environment file:
 cp .env.example .env
 ```
 
-Configure your `.env` file:
+Configure your frontend `.env` file:
 
 ```env
 # Stream Chat Configuration
 VITE_STREAM_API_KEY=your_stream_api_key_here
 
-# Backend URL
-VITE_BACKEND_URL=http://localhost:3000
+# Backend URL (match backend PORT)
+VITE_BACKEND_URL=http://localhost:4550
+
+### 4. Kaggle GPU: MedGemma + Gradio
+
+If you want to run the MedGemma model on Kaggle (GPU) and expose a public Gradio endpoint, use the following cells in a Kaggle Notebook:
+
+```python
+# Cell 1: Install required packages
+!pip install -q -U transformers accelerate huggingface-hub safetensors bitsandbytes pillow requests gradio
+
+# Cell 2: Login, Check GPU, and Load Model
+import torch
+import gradio as gr
+from transformers import AutoProcessor, AutoModelForImageTextToText
+from huggingface_hub import login
+from kaggle_secrets import UserSecretsClient
+from PIL import Image
+import os
+
+print(f"Torch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+# Hugging Face login via Kaggle Secrets (set key name HF_TOKENS)
+try:
+    user_secrets = UserSecretsClient()
+    hf_token = user_secrets.get_secret("HF_TOKENS")
+    login(token=hf_token)
+    print("Logged in to Hugging Face successfully.")
+except Exception as e:
+    print(f"Could not log in to Hugging Face. Add HF_TOKENS to Kaggle Secrets. Error: {e}")
+
+print("Loading model... This may take a few minutes.")
+model_id = "google/medgemma-4b-it"
+model = AutoModelForImageTextToText.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto",
+)
+processor = AutoProcessor.from_pretrained(model_id)
+print("Model loaded successfully.")
+
+# Cell 3: Define the Prediction Function
+from PIL import Image
+
+def predict_api(message_dict, history):
+    messages = [{"role": "system", "content": [{"type": "text", "text": "You are an expert doctor."}]}]
+    for user_msg, bot_msg in history:
+        messages.append({"role": "user", "content": [{"type": "text", "text": user_msg}]})
+        messages.append({"role": "assistant", "content": [{"type": "text", "text": bot_msg}]})
+
+    user_text = message_dict['text']
+    image_files = message_dict.get('files', [])
+    current_content = []
+    if image_files:
+        image_path = image_files[0]
+        image = Image.open(image_path)
+        current_content.append({"type": "image", "image": image})
+    current_content.append({"type": "text", "text": user_text})
+    messages.append({"role": "user", "content": current_content})
+
+    inputs = processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="pt"
+    ).to(model.device, dtype=torch.bfloat16)
+
+    input_len = inputs["input_ids"].shape[-1]
+    with torch.inference_mode():
+        generation = model.generate(**inputs, max_new_tokens=512, do_sample=False)
+        generation = generation[0][input_len:]
+    decoded = processor.decode(generation, skip_special_tokens=True)
+    return decoded
+
+# Cell 4: Launch the Gradio Chat Interface (gets a public URL)
+print("Launching Gradio interface... This will provide a public URL.")
+gr.ChatInterface(
+    predict_api,
+    multimodal=True
+).launch(
+    debug=True,
+    share=True  # IMPORTANT: needed for a public URL
+)
+```
+
+After running, copy the public Gradio URL and set it in your backend `.env`:
+
+```env
+GRADIO_BASE_URL=https://<your-gradio-subdomain>.gradio.live/
+# For Gradio ChatInterface, the API path is commonly /predict
+GRADIO_API_NAME=/predict
+```
 ```
 
 ### 4. Getting API Keys
@@ -120,18 +208,12 @@ VITE_BACKEND_URL=http://localhost:3000
 3. Copy your **API Key** and **API Secret** from the dashboard
 4. Use the same **API Key** in both backend and frontend `.env` files
 
-#### OpenAI API Setup
+#### MedGemma (Gradio) Setup
 
-1. Sign up at [OpenAI Platform](https://platform.openai.com/)
-2. Navigate to API Keys section
-3. Create a new API key
-4. Add it to your backend `.env` file
-
-#### Tavily API Setup
-
-1. Sign up at [Tavily](https://tavily.com/)
-2. Get your API key from the dashboard
-3. Add it to your backend `.env` file
+1. Deploy or open a public Gradio MedGemma space
+2. Copy the public base URL (e.g. `https://xxxx.gradio.live/` or HF Space URL)
+3. Identify the API endpoint path (often `/predict` or `/chat`)
+4. Place both in the backend `.env`
 
 ## 🚀 Running the Application
 
@@ -142,7 +224,7 @@ cd nodejs-ai-assistant
 npm run dev
 ```
 
-The backend will run on `http://localhost:3000`
+The backend will run on `http://localhost:4550`
 
 ### Start the Frontend Application
 
@@ -151,7 +233,22 @@ cd react-stream-ai-assistant
 npm run dev
 ```
 
-The frontend will run on `http://localhost:8080`
+The frontend will run on the port Vite prints (typically 5173)
+
+## 🧭 Publishing to GitHub
+
+Initialize a new Git repo (or use the existing one), commit, and push:
+
+```powershell
+git init
+git add .
+git commit -m "Initial commit: Stream + MedGemma chat"
+git branch -M main
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
+```
+
+Make sure you do NOT commit actual `.env` files. Use the provided `.env.example` files for sharing configuration keys.
 
 ## 📖 How GetStream.io Works
 
@@ -172,9 +269,8 @@ graph TD
     A[Frontend React App] --> B[Stream Chat React Components]
     B --> C[Stream Chat API]
     C --> D[Backend Node.js Server]
-    D --> E[OpenAI API]
-    D --> F[Tavily Web Search]
-    D --> G[AI Agent Management]
+    D --> E[MedGemma (Gradio)]
+    D --> F[AI Agent Management]
 ```
 
 ### Key Features Used
@@ -193,11 +289,10 @@ The application features a sophisticated AI agent management system:
 
 ### Agent Lifecycle
 
-1. **Creation**: AI agents are created per channel when requested
-2. **Initialization**: OpenAI assistant setup with web search capabilities
-3. **Message Handling**: Processes user messages and generates responses
-4. **Web Search**: Automatically searches the web for current information
-5. **Cleanup**: Automatic disposal after inactivity
+1. Creation per channel
+2. Initialization (connect to Gradio)
+3. Message handling (text + image URLs)
+4. Timeout & cleanup for inactivity
 
 ### Agent Capabilities
 
@@ -280,13 +375,12 @@ npm run build
 
 ### Backend
 
-- **Node.js** - Runtime environment
-- **Express** - Web framework
-- **Stream Chat** - Real-time messaging
-- **OpenAI** - AI language model
-- **Axios** - HTTP client
-- **CORS** - Cross-origin resource sharing
-- **TypeScript** - Type safety
+- Node.js
+- Express
+- Stream Chat
+- Gradio Client
+- CORS
+- TypeScript
 
 ### Frontend
 
@@ -316,9 +410,8 @@ This project is licensed under the MIT License.
 For support and questions:
 
 - Check the [GetStream.io Documentation](https://getstream.io/chat/docs/)
-- Review [OpenAI API Documentation](https://platform.openai.com/docs)
 - Create an issue in this repository
 
 ---
 
-Built with ❤️ using GetStream.io, OpenAI, and modern web technologies.
+Built with ❤️ using GetStream.io, MedGemma, and modern web technologies.

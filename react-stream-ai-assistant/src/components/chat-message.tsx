@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bot, Check, Copy } from "lucide-react";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   useAIState,
@@ -13,7 +13,7 @@ import {
 
 const ChatMessage: React.FC = () => {
   const { message } = useMessageContext();
-  const { channel } = useChannelStateContext();
+  const { channel, messages } = useChannelStateContext();
   const { aiState } = useAIState(channel);
 
   const { streamedMessageText } = useMessageTextStreaming({
@@ -24,6 +24,30 @@ const ChatMessage: React.FC = () => {
 
   const isUser = !message.user?.id?.startsWith("ai-bot");
   const [copied, setCopied] = useState(false);
+
+  const isAI = !isUser;
+  const lastAIMessageId = useMemo(() => {
+    const last = [...(messages || [])]
+      .reverse()
+      .find((m) => m.user?.id?.startsWith("ai-bot"));
+    return last?.id;
+  }, [messages]);
+
+  const canRegenerate = isAI && message.id === lastAIMessageId;
+
+  const regenerateFromPreviousUser = async () => {
+    if (!channel || !messages) return;
+    const idx = messages.findIndex((m) => m.id === message.id);
+    if (idx <= 0) return;
+    const prevUserMsg = [...messages]
+      .slice(0, idx)
+      .reverse()
+      .find((m) => !m.user?.id?.startsWith("ai-bot"));
+    if (!prevUserMsg) return;
+    const text = prevUserMsg.text || "";
+    const attachments = prevUserMsg.attachments || [];
+    await channel.sendMessage({ text, attachments });
+  };
 
   const copyToClipboard = async () => {
     if (streamedMessageText) {
@@ -155,6 +179,29 @@ const ChatMessage: React.FC = () => {
               </ReactMarkdown>
             </div>
 
+            {/* Image Attachments */}
+            {!!message.attachments?.length && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {message.attachments
+                  ?.filter((a) => a.type === "image")
+                  .map((a, idx) => {
+                    const src = (a.image_url || a.asset_url || a.thumb_url || a.og_scrape_url) as string | undefined;
+                    if (!src) return null;
+                    const alt = (a.title as string) || `image-${idx}`;
+                    return (
+                      <a key={idx} href={src} target="_blank" rel="noreferrer" className="block">
+                        <img
+                          src={src}
+                          alt={alt}
+                          className="w-full h-32 object-cover rounded-md border border-muted/50"
+                          loading="lazy"
+                        />
+                      </a>
+                    );
+                  })}
+              </div>
+            )}
+
             {/* Loading State */}
             {aiState && !streamedMessageText && !message.text && (
               <div className="flex items-center gap-2 mt-2 pt-2">
@@ -198,6 +245,16 @@ const ChatMessage: React.FC = () => {
                     </>
                   )}
                 </Button>
+                {canRegenerate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={regenerateFromPreviousUser}
+                    className="h-6 px-2 text-xs hover:bg-muted rounded-md ml-1"
+                  >
+                    Regenerate
+                  </Button>
+                )}
               </div>
             )}
           </div>

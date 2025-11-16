@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_PLATFORM } from "@/lib/agent-platform";
 import { useCallback, useEffect, useState } from "react";
 
 export type AgentStatus = "disconnected" | "connecting" | "connected";
@@ -64,6 +65,7 @@ export const useAIAgentStatus = ({
         body: JSON.stringify({
           channel_id: channelId,
           channel_type: "messaging",
+          agent_platform: DEFAULT_AGENT_PLATFORM,
         }),
       });
 

@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DEFAULT_AGENT_PLATFORM } from "@/lib/agent-platform";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -53,13 +54,13 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
     syncChannelWithUrl();
   }, [channelId, client, setActiveChannel]);
 
-  const handleNewChatMessage = async (message: { text: string }) => {
+  const handleNewChatMessage = async (message: { text: string; files?: File[] }) => {
     if (!user.id) return;
 
     try {
       // 1. Create a new channel with the user as the only member
       const newChannel = client.channel("messaging", uuidv4(), {
-        name: message.text.substring(0, 50),
+        name: (message.text || "New Session").substring(0, 50),
         members: [user.id],
       });
       await newChannel.watch();
@@ -82,6 +83,7 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
         body: JSON.stringify({
           channel_id: newChannel.id,
           channel_type: "messaging",
+          agent_platform: DEFAULT_AGENT_PLATFORM,
         }),
       });
 
@@ -95,7 +97,31 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
 
       // 5. Wait for AI agent to be added as member, then send message
       await memberAddedPromise;
-      await newChannel.sendMessage(message);
+
+      // Upload any images and send first message with attachments
+      const files = message.files || [];
+      const attachments = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const res = (await newChannel.sendImage(file)) as any;
+            const url = (res?.file ?? "") as string;
+            if (!url) return null;
+            return {
+              type: "image",
+              image_url: url,
+              asset_url: url,
+              thumb_url: url,
+              title: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            } as any;
+          } catch {
+            return null;
+          }
+        })
+      );
+      const filtered = attachments.filter(Boolean) as any[];
+      await newChannel.sendMessage({ text: message.text, attachments: filtered });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Something went wrong";

@@ -14,6 +14,9 @@ app.use(cors({ origin: "*" }));
 const aiAgentCache = new Map<string, AIAgent>();
 const pendingAiAgents = new Set<string>();
 
+const DEFAULT_AGENT_PLATFORM: AgentPlatform = AgentPlatform.MEDGEMMA;
+const resolveAgentPlatform = (): AgentPlatform => AgentPlatform.MEDGEMMA;
+
 // TODO: temporary set to 8 hours, should be cleaned up at some point
 const inactivityThreshold = 480 * 60 * 1000;
 // Periodically check for inactive AI agents and dispose of them
@@ -40,7 +43,7 @@ app.get("/", (req, res) => {
  * Handle the request to start the AI Agent
  */
 app.post("/start-ai-agent", async (req, res) => {
-  const { channel_id, channel_type = "messaging" } = req.body;
+  const { channel_id, channel_type = "messaging", agent_platform } = req.body;
   console.log(`[API] /start-ai-agent called for channel: ${channel_id}`);
 
   // Simple validation
@@ -51,15 +54,19 @@ app.post("/start-ai-agent", async (req, res) => {
 
   const user_id = `ai-bot-${channel_id.replace(/[!]/g, "")}`;
 
+  const platform = resolveAgentPlatform();
+
   try {
     // Prevent multiple agents from being created for the same channel simultaneously
     if (!aiAgentCache.has(user_id) && !pendingAiAgents.has(user_id)) {
-      console.log(`[API] Creating new agent for ${user_id}`);
+      console.log(
+        `[API] Creating new agent for ${user_id} using platform ${platform}`
+      );
       pendingAiAgents.add(user_id);
 
       await serverClient.upsertUser({
         id: user_id,
-        name: "AI Writing Assistant",
+        name: "AI Assistant",
       });
 
       const channel = serverClient.channel(channel_type, channel_id);
@@ -67,7 +74,7 @@ app.post("/start-ai-agent", async (req, res) => {
 
       const agent = await createAgent(
         user_id,
-        AgentPlatform.OPENAI,
+        platform,
         channel_type,
         channel_id
       );
